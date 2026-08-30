@@ -9,7 +9,7 @@
  * per expert, eight experts, forty layers.  Each row's float operations must
  * stay in exactly this order -- float addition is not associative and the
  * engine's token stream is required to be byte-identical to the reference.
- * tests/test_gsgemv.c holds the pre-restructure kernel verbatim and compares
+ * tests/test_gsgemv.c preserves the pre-restructure arithmetic and compares
  * raw float bits, so any reassociation fails there rather than surfacing as
  * drifted text much later.
  *

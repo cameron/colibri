@@ -7,11 +7,11 @@
  * interleaved, routed through sse41_kernels.h) and scalar. The AVX2 and
  * scalar tiers must keep their exact sequence of float operations -- float
  * addition is not associative, and this engine's token stream is required
- * to stay byte-identical to the reference. reference_gs_gemv below is a
- * VERBATIM copy of the kernel as it shipped before either the AVX2
- * row-interleave or the SSE4.1 tier existed, and the AVX2/scalar properties
- * compare the live kernel against it with memcmp on raw float bits. The
- * SSE4.1 tier has no pre-existing byte-identical output to match -- its
+ * to stay byte-identical to the reference. reference_gs_gemv below preserves
+ * the kernel arithmetic from before either the AVX2 row-interleave or the
+ * SSE4.1 tier existed, and the AVX2/scalar properties compare the live kernel
+ * against it with memcmp on raw float bits. The SSE4.1 tier has no pre-existing
+ * byte-identical output to match -- its
  * reduction tree is a genuinely different shape -- so it alone is checked
  * by max relative+absolute error instead.
  *
@@ -59,10 +59,10 @@ static uint32_t rng_next(void) { rng_state = rng_state * 1664525u + 1013904223u;
 static float rng_f32(void) { return (float)((int32_t)(rng_next() >> 8) - 8388608) / 8388608.0f; }
 
 /* ---------------------------------------------------------------------------
- * VERBATIM copy of matmul_q_gs as it shipped before the SSE4.1 tier was
- * added. Do not tidy, reformat or "improve" this: its value is that it is
- * the old arithmetic, character for character. If this drifts, the test
- * proves nothing.
+ * Copy of matmul_q_gs as it shipped before the SSE4.1 tier was added. The
+ * group-to-output accumulate explicitly spells the FMA that the default -O3
+ * build contracts it to. This keeps the reference's intended single rounding
+ * independent of optimization level and -ffp-contract.
  * ------------------------------------------------------------------------- */
 static void reference_gs_gemv(float *y, const float *x, const int8_t *q, const float *scale,
                               int I, int O, int gs) {
@@ -86,7 +86,7 @@ static void reference_gs_gemv(float *y, const float *x, const int8_t *q, const f
                 __m128 s = _mm_add_ps(_mm256_castps256_ps128(a0), _mm256_extractf128_ps(a0,1));
                 s = _mm_add_ps(s, _mm_movehl_ps(s,s));
                 s = _mm_add_ss(s, _mm_shuffle_ps(s,s,1));
-                acc += _mm_cvtss_f32(s) * sc[gi];
+                acc = fmaf(_mm_cvtss_f32(s), sc[gi], acc);
             }
             y[o] = acc;
         }
